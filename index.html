@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siddharth's Portfolio</title>
+    <script type="module" src="/src/main.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Welcome Screen */
+        .welcome-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 2000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .welcome-screen h1 {
+            font-size: clamp(24px, 5vw, 36px);
+            margin-bottom: 20px;
+        }
+
+        .welcome-screen p {
+            font-size: clamp(14px, 3vw, 18px);
+            margin: 10px 0;
+            max-width: 600px;
+        }
+
+        .welcome-screen button {
+            padding: 10px 20px;
+            font-size: clamp(16px, 4vw, 20px);
+            background: #1e90ff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+
+        .welcome-screen button:hover {
+            background: #4169e1;
+        }
+
+        /* Pop-up UI */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2vw;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            display: none;
+            text-align: center;
+            z-index: 1000;
+            width: 80vw;
+            max-width: 300px;
+            font-size: clamp(12px, 3vw, 16px);
+        }
+
+        .popup-content {
+            position: relative;
+        }
+
+        #close-popup {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: clamp(16px, 4vw, 20px);
+            cursor: pointer;
+        }
+
+        /* On-Screen Controls */
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            pointer-events: none;
+            display: none; /* Hidden until game starts */
+        }
+
+        .joystick-container {
+            width: 100px;
+            height: 100px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            position: relative;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .joystick {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            pointer-events: none;
+        }
+
+        .jump-button {
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 255, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            pointer-events: auto;
+            margin-right: 20px;
+        }
+
+        /* Fade-in Animation */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Hide controls on laptop/desktop devices */
+        @media (min-width: 768px) {
+            .controls {
+                display: none !important; /* Override any display changes */
+            }
+        }
+
+        /* Show controls on mobile devices */
+        @media (max-width: 767px) {
+            .controls {
+                display: flex; /* Default for mobile, overridden by JS until game starts */
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Welcome Screen -->
+    <div class="welcome-screen" id="welcome-screen">
+        <h1>Welcome to Siddharth's Portfolio</h1>
+        <p>Explore my interactive 3D portfolio world! Navigate through the forest to discover my projects, education, and achievements.</p>
+        <p><strong>Desktop:</strong> Use W/A/S/D to move, Space to jump, and mouse to look around. Press esc key to show cursor, then click on objects with red mark over them, to view details.</p>
+        <p><strong>Mobile:</strong> Use the joystick to move, jump button to jump, and two-finger touch to look around. Tap objects with red mark over them, for details.</p>
+        <button id="start-button">Start Exploring</button>
+    </div>
+
+    <!-- Pop-up for Portfolio Sections -->
+    <div id="portfolio-popup" class="popup">
+        <div class="popup-content">
+            <span id="close-popup">×</span>
+            <h2 id="popup-title">Portfolio Section</h2>
+            <p id="popup-description">Click on an object to reveal details.</p>
+        </div>
+    </div>
+
+    <!-- On-Screen Controls for Mobile -->
+    <div class="controls" id="controls">
+        <div class="joystick-container" id="joystick-container">
+            <div class="joystick" id="joystick"></div>
+        </div>
+        <div class="jump-button" id="jump-button">Jump</div>
+    </div>
+
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9215d573b96b53db',t:'MTc0MjE0NDcwOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
