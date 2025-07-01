@@ -1,8 +1,15 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import * as dat from 'dat.gui';
+import gsap from 'gsap';
 
 // 🌎 Scene Setup
 const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x87ceeb, 0.0008); // Add atmospheric fog
 
 // 🎥 Camera (FPS-style)
 const camera = new THREE.PerspectiveCamera(
@@ -10,42 +17,204 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 2, 5);
 
-// 🖥️ Renderer
+// 🖥️ Renderer with enhanced settings
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x87ceeb); // Light blue sky color
-renderer.shadowMap.enabled = true; // Enable shadows
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
-// 💡 Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+// 🌟 Post-processing setup
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.3, // strength
+    0.4, // radius
+    0.85 // threshold
+);
+composer.addPass(bloomPass);
+
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
+
+// 🎛️ GUI Controls
+const gui = new dat.GUI();
+const params = {
+    exposure: 1.0,
+    bloomStrength: 0.3,
+    bloomRadius: 0.4,
+    bloomThreshold: 0.85,
+    dayNightSpeed: 0.001,
+    weatherEnabled: true,
+    fogDensity: 0.0008
+};
+
+gui.add(params, 'exposure', 0.1, 2).onChange(value => {
+    renderer.toneMappingExposure = value;
+});
+gui.add(params, 'bloomStrength', 0.0, 3.0).onChange(value => {
+    bloomPass.strength = value;
+});
+gui.add(params, 'bloomRadius', 0.0, 1.0).onChange(value => {
+    bloomPass.radius = value;
+});
+gui.add(params, 'bloomThreshold', 0.0, 1.0).onChange(value => {
+    bloomPass.threshold = value;
+});
+gui.add(params, 'dayNightSpeed', 0.0, 0.01);
+gui.add(params, 'weatherEnabled');
+gui.add(params, 'fogDensity', 0.0, 0.005).onChange(value => {
+    scene.fog.density = value;
+});
+
+// Hide GUI initially, show when 'G' is pressed
+gui.domElement.style.display = 'none';
+
+// 💡 Enhanced Lighting System
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambientLight);
 
-// Sun and Directional Light
+// Dynamic Sun and Directional Light
 const sunLight = new THREE.DirectionalLight(0xfff3e0, 1.5);
 sunLight.position.set(5, 10, 5);
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.width = 1024;
-sunLight.shadow.mapSize.height = 1024;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
 sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 50;
+sunLight.shadow.camera.left = -25;
+sunLight.shadow.camera.right = 25;
+sunLight.shadow.camera.top = 25;
+sunLight.shadow.camera.bottom = -25;
 scene.add(sunLight);
 
-// Visible Sun
-const sunGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+// Animated Sun with glow effect
+const sunGeometry = new THREE.SphereGeometry(0.8, 32, 32);
+const sunMaterial = new THREE.MeshBasicMaterial({ 
+    color: 0xffff00,
+    transparent: true,
+    opacity: 0.9
+});
 const sun = new THREE.Mesh(sunGeometry, sunMaterial);
 sun.position.set(5, 10, 5);
 scene.add(sun);
 
-// 🌿 Infinite Ground
-const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
-const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+// Sun Glow Effect
+const sunGlowGeometry = new THREE.SphereGeometry(1.2, 32, 32);
+const sunGlowMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 1.0 },
+        color: { value: new THREE.Color(0xffaa00) }
+    },
+    vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform float time;
+        uniform vec3 color;
+        varying vec3 vNormal;
+        void main() {
+            float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+            gl_FragColor = vec4(color, intensity * (0.8 + 0.2 * sin(time * 2.0)));
+        }
+    `,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    transparent: true
+});
+const sunGlow = new THREE.Mesh(sunGlowGeometry, sunGlowMaterial);
+sunGlow.position.copy(sun.position);
+scene.add(sunGlow);
+
+// Additional atmospheric lights
+const moonLight = new THREE.DirectionalLight(0x6699ff, 0.3);
+moonLight.position.set(-5, 8, -5);
+moonLight.visible = false;
+scene.add(moonLight);
+
+// Point lights for mystical atmosphere
+const mysticalLights = [];
+for (let i = 0; i < 8; i++) {
+    const light = new THREE.PointLight(0x66aaff, 0.5, 20);
+    light.position.set(
+        Math.random() * 200 - 100,
+        2 + Math.random() * 8,
+        Math.random() * 200 - 100
+    );
+    scene.add(light);
+    mysticalLights.push(light);
+}
+
+// 🌿 Enhanced Ground with Water and Terrain Variety
+const groundGeometry = new THREE.PlaneGeometry(1000, 1000, 50, 50);
+const groundMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0x228B22,
+    roughness: 0.8,
+    metalness: 0.1
+});
+
+// Add some height variation to ground
+const groundVertices = groundGeometry.attributes.position.array;
+for (let i = 0; i < groundVertices.length; i += 3) {
+    groundVertices[i + 2] = Math.random() * 0.5; // Z is height when rotated
+}
+groundGeometry.attributes.position.needsUpdate = true;
+groundGeometry.computeVertexNormals();
+
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
 ground.receiveShadow = true;
 scene.add(ground);
+
+// 🌊 Water Feature
+const waterGeometry = new THREE.PlaneGeometry(50, 50, 20, 20);
+const waterMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 1.0 },
+        color: { value: new THREE.Color(0x006994) },
+        opacity: { value: 0.7 }
+    },
+    vertexShader: `
+        uniform float time;
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            vec3 pos = position;
+            pos.z += sin(pos.x * 0.5 + time) * 0.3;
+            pos.z += sin(pos.y * 0.3 + time * 1.5) * 0.2;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform float time;
+        uniform vec3 color;
+        uniform float opacity;
+        varying vec2 vUv;
+        void main() {
+            vec2 uv = vUv;
+            float wave = sin(uv.x * 10.0 + time) * sin(uv.y * 10.0 + time * 1.3) * 0.1;
+            gl_FragColor = vec4(color + wave, opacity);
+        }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide
+});
+
+const water = new THREE.Mesh(waterGeometry, waterMaterial);
+water.rotation.x = -Math.PI / 2;
+water.position.set(-60, 0.1, -60);
+scene.add(water);
 
 // 🎮 Player
 const player = new THREE.Object3D();
@@ -63,19 +232,40 @@ let velocityY = 0;
 // 🎬 Game State
 let gameStarted = false;
 
-// 🚀 Start Game Function
+// 🚀 Enhanced Start Game Function
 function startGame() {
     gameStarted = true;
     document.getElementById("welcome-screen").style.display = "none";
+    document.getElementById("loading").style.display = "none";
+    
     if (window.innerWidth < 768) { // Only show controls on mobile
         document.getElementById("controls").style.display = "flex";
+    } else {
+        // Show HUD and teleport guide on desktop
+        document.getElementById("hud").style.display = "block";
+        document.getElementById("teleport-guide").style.display = "block";
     }
+    
+    // Hide GUI initially
+    gui.domElement.style.display = 'none';
+    
     animate(); // Start animation loop
 }
 
 document.getElementById("start-button").addEventListener("click", startGame);
 
-// ⌨️ Keyboard Controls
+// 🎮 Enhanced Game Initialization
+function showLoadingScreen() {
+    document.getElementById("loading").style.display = "block";
+    setTimeout(() => {
+        document.getElementById("loading").style.display = "none";
+    }, 2000); // Show loading for 2 seconds
+}
+
+// Show loading screen on page load
+showLoadingScreen();
+
+// ⌨️ Enhanced Keyboard Controls
 document.addEventListener("keydown", (event) => {
     if (!gameStarted) return; // Disable controls until game starts
     if (event.key === "w" || event.key === "ArrowUp") movement.forward = true;
@@ -86,6 +276,16 @@ document.addEventListener("keydown", (event) => {
         velocityY = 0.3;
         movement.jumping = true;
     }
+    // Toggle GUI with 'G' key
+    if (event.key === "g" || event.key === "G") {
+        gui.domElement.style.display = gui.domElement.style.display === 'none' ? 'block' : 'none';
+    }
+    // Teleport to different areas
+    if (event.key === "1") teleportToArea("projects");
+    if (event.key === "2") teleportToArea("education");
+    if (event.key === "3") teleportToArea("certificates");
+    if (event.key === "4") teleportToArea("water");
+    if (event.key === "5") teleportToArea("center");
 });
 
 document.addEventListener("keyup", (event) => {
@@ -191,8 +391,84 @@ document.getElementById("jump-button").addEventListener("touchstart", () => {
 const clickableObjects = [];
 const animatedObjects = [];
 const arrows = [];
+const particles = [];
 
-// 🔎 Function to Make Objects Clickable and Add Arrow
+// ✨ Particle System
+class Particle {
+    constructor(position, velocity, color, life) {
+        this.position = position.clone();
+        this.velocity = velocity.clone();
+        this.color = color;
+        this.life = life;
+        this.maxLife = life;
+        
+        const geometry = new THREE.SphereGeometry(0.02 + Math.random() * 0.03);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: color,
+            transparent: true,
+            opacity: 0.8
+        });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.copy(this.position);
+        scene.add(this.mesh);
+    }
+    
+    update() {
+        this.life -= 0.016; // Assuming 60fps
+        this.position.add(this.velocity);
+        this.velocity.multiplyScalar(0.98); // Drag
+        this.mesh.position.copy(this.position);
+        
+        const alpha = this.life / this.maxLife;
+        this.mesh.material.opacity = alpha * 0.8;
+        
+        if (this.life <= 0) {
+            scene.remove(this.mesh);
+            return false;
+        }
+        return true;
+    }
+}
+
+function createParticleExplosion(position, color = 0xffffff, count = 20) {
+    for (let i = 0; i < count; i++) {
+        const velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            Math.random() * 3 + 1,
+            (Math.random() - 0.5) * 2
+        );
+        const particle = new Particle(position, velocity, color, 2 + Math.random() * 2);
+        particles.push(particle);
+    }
+}
+
+// 🚀 Teleportation System
+function teleportToArea(area) {
+    const positions = {
+        "projects": new THREE.Vector3(40, 2, 40),
+        "education": new THREE.Vector3(60, 2, 60),
+        "certificates": new THREE.Vector3(80, 2, 80),
+        "water": new THREE.Vector3(-60, 2, -60),
+        "center": new THREE.Vector3(0, 2, 0)
+    };
+    
+    if (positions[area]) {
+        createParticleExplosion(player.position, 0x00ffff, 30);
+        
+        gsap.to(player.position, {
+            x: positions[area].x,
+            y: positions[area].y,
+            z: positions[area].z,
+            duration: 1.5,
+            ease: "power2.inOut",
+            onComplete: () => {
+                createParticleExplosion(player.position, 0x00ff00, 30);
+            }
+        });
+    }
+}
+
+// 🔎 Function to Make Objects Clickable and Add Enhanced Arrow
 function makeClickable(object, section) {
     object.traverse((child) => {
         if (child.isMesh) {
@@ -201,97 +477,293 @@ function makeClickable(object, section) {
         }
     });
 
-    const arrowGeometry = new THREE.ConeGeometry(0.2, 0.5, 32);
-    const arrowMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    // Enhanced Animated Arrow with glow
+    const arrowGeometry = new THREE.ConeGeometry(0.3, 0.8, 8);
+    const arrowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.8
+    });
     const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
-    arrow.position.set(object.position.x, object.position.y + 3, object.position.z);
+    arrow.position.set(object.position.x, object.position.y + 4, object.position.z);
     arrow.rotation.x = Math.PI; // Point downward
+    
+    // Add glow to arrow
+    const arrowGlowGeometry = new THREE.ConeGeometry(0.4, 1.0, 8);
+    const arrowGlowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff4444,
+        transparent: true,
+        opacity: 0.3
+    });
+    const arrowGlow = new THREE.Mesh(arrowGlowGeometry, arrowGlowMaterial);
+    arrowGlow.position.copy(arrow.position);
+    arrowGlow.rotation.x = Math.PI;
+    
     scene.add(arrow);
-    arrows.push(arrow);
+    scene.add(arrowGlow);
+    arrows.push({ arrow, glow: arrowGlow, baseY: arrow.position.y });
+    
+    // Add click particles effect
+    arrow.userData.clickEffect = () => {
+        createParticleExplosion(arrow.position, 0xff0000, 15);
+    };
 }
 
-// 🔄 Function to Load 3D Models
+// 🔄 Enhanced Function to Load 3D Models with Effects
 const loader = new GLTFLoader();
-function loadModel(path, position, scale, section = null, animateType = null) {
+function loadModel(path, position, scale, section = null, animateType = null, special = false) {
     loader.load(path, (gltf) => {
         const model = gltf.scene;
         model.position.set(...position);
         model.scale.set(...scale);
         model.castShadow = true;
         model.receiveShadow = true;
+        
+        // Add special effects for important objects
+        if (special) {
+            const light = new THREE.PointLight(0x4444ff, 0.5, 10);
+            light.position.copy(model.position);
+            light.position.y += 3;
+            scene.add(light);
+            
+            // Add floating particles around special objects
+            setInterval(() => {
+                if (Math.random() < 0.3) {
+                    const particlePos = model.position.clone();
+                    particlePos.add(new THREE.Vector3(
+                        (Math.random() - 0.5) * 6,
+                        Math.random() * 4 + 1,
+                        (Math.random() - 0.5) * 6
+                    ));
+                    const velocity = new THREE.Vector3(0, 0.1, 0);
+                    const particle = new Particle(particlePos, velocity, 0x4444ff, 3);
+                    particles.push(particle);
+                }
+            }, 1000);
+        }
+        
         scene.add(model);
         if (section) makeClickable(model, section);
-        if (animateType) animatedObjects.push({ object: model, type: animateType });
+        if (animateType) animatedObjects.push({ object: model, type: animateType, originalY: model.position.y });
     });
 }
 
-// 🌳 Increased Density of Trees
+// 🌳 Enhanced Tree System with Variety and Clustering
 const treeTypes = [
     'tree_pineTallA.glb', 'tree_pineTallB.glb', 'tree_palmTall.glb', 'tree_default.glb',
     'tree_oak.glb', 'tree_simple.glb', 'tree_tall.glb', 'tree_pineRoundA.glb'
 ];
-treeTypes.forEach((tree, index) => {
-    for (let i = 0; i < 32; i++) {
-        loadModel(`/Models/${tree}`, [
-            (index * 15) + (Math.random() * 60 - 30),
-            0,
-            (i * 5) + (Math.random() * 40 - 20)
-        ], [2, 2, 2]);
+
+// Create tree clusters for more natural look
+const treeClusters = [
+    { center: { x: 0, z: 30 }, radius: 25, density: 40 },
+    { center: { x: -40, z: -20 }, radius: 20, density: 30 },
+    { center: { x: 60, z: 10 }, radius: 15, density: 25 },
+    { center: { x: 20, z: -50 }, radius: 18, density: 35 }
+];
+
+treeClusters.forEach((cluster, clusterIndex) => {
+    for (let i = 0; i < cluster.density; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = Math.random() * cluster.radius;
+        const x = cluster.center.x + Math.cos(angle) * distance;
+        const z = cluster.center.z + Math.sin(angle) * distance;
+        
+        const treeType = treeTypes[Math.floor(Math.random() * treeTypes.length)];
+        const scale = 1.5 + Math.random() * 1.5;
+        
+        loadModel(`/Models/${treeType}`, [x, 0, z], [scale, scale, scale]);
     }
 });
 
-// 📜 Personal Information (Signpost)
+// 🏰 Floating Islands for Major Sections
+function createFloatingIsland(position, size, section) {
+    // Island base
+    const islandGeometry = new THREE.CylinderGeometry(size, size * 0.8, 2, 32);
+    const islandMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B4513,
+        roughness: 0.8
+    });
+    const island = new THREE.Mesh(islandGeometry, islandMaterial);
+    island.position.set(position.x, position.y + 3, position.z);
+    island.castShadow = true;
+    island.receiveShadow = true;
+    scene.add(island);
+    
+    // Grass top
+    const grassGeometry = new THREE.CylinderGeometry(size * 1.1, size * 1.1, 0.2, 32);
+    const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+    const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+    grass.position.set(position.x, position.y + 4.1, position.z);
+    scene.add(grass);
+    
+    // Make island float
+    animatedObjects.push({ 
+        object: island, 
+        type: "float", 
+        originalY: island.position.y,
+        partner: grass
+    });
+    
+    return island;
+}
+
+// Create floating islands for different sections
+const projectIsland = createFloatingIsland({ x: 40, y: 5, z: 40 }, 8, "projects");
+const educationIsland = createFloatingIsland({ x: -50, y: 7, z: 50 }, 6, "education");
+const certificateIsland = createFloatingIsland({ x: 80, y: 6, z: -30 }, 7, "certificates");
+
+// 📜 Personal Information (Enhanced Signpost with Portal Effect)
 loadModel("/Models/sign.glb", [
-    5 + Math.random() * 10,
+    8,
     0,
-    5 + Math.random() * 10
-], [1.5, 1.5, 1.5], "Personal Information");
+    8
+], [2, 2, 2], "Personal Information", null, true);
 
-// 🪨 Group of Big Rocks (Projects)
-loadModel("/Models/rock_largeA.glb", [20 + Math.random() * 20, 0, 20 + Math.random() * 20], [2, 2, 2], "Star Classification");
-loadModel("/Models/rock_largeA.glb", [30 + Math.random() * 20, 0, 30 + Math.random() * 20], [2, 2, 2], "Pneumonia Detection");
-loadModel("/Models/rock_largeA.glb", [40 + Math.random() * 20, 0, 40 + Math.random() * 20], [2, 2, 2], "Grocery Management");
-loadModel("/Models/rock_largeA.glb", [50 + Math.random() * 20, 0, 50 + Math.random() * 20], [2, 2, 2], "Restaurant Management");
-loadModel("/Models/rock_largeA.glb", [60 + Math.random() * 20, 0, 60 + Math.random() * 20], [2, 2, 2], "Travel Genie");
-loadModel("/Models/rock_largeA.glb", [70 + Math.random() * 20, 0, 70 + Math.random() * 20], [2, 2, 2], "Interest Calculator");
+// Add mystical portal near signpost
+const portalGeometry = new THREE.RingGeometry(1, 2, 32);
+const portalMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 1.0 },
+        color1: { value: new THREE.Color(0x00ffff) },
+        color2: { value: new THREE.Color(0xff00ff) }
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform float time;
+        uniform vec3 color1;
+        uniform vec3 color2;
+        varying vec2 vUv;
+        void main() {
+            vec2 center = vec2(0.5, 0.5);
+            float dist = distance(vUv, center);
+            float wave = sin(dist * 20.0 - time * 5.0) * 0.5 + 0.5;
+            vec3 color = mix(color1, color2, wave);
+            float alpha = smoothstep(0.3, 0.5, dist) * (1.0 - smoothstep(0.48, 0.5, dist));
+            gl_FragColor = vec4(color, alpha);
+        }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide
+});
+const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+portal.position.set(12, 2, 8);
+portal.rotation.x = -Math.PI / 2;
+scene.add(portal);
+animatedObjects.push({ object: portal, type: "portal" });
 
-// 🌸 Group of Flowers (Education)
-function addFlower(position, label) {
-    const stemGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1, 32);
-    const stemMaterial = new THREE.MeshStandardMaterial({ color: 0x00FF00 });
+// 🪨 Enhanced Project Displays with Variety
+const projectRocks = [
+    { model: "rock_largeA.glb", pos: [35, 0, 35], section: "Star Classification" },
+    { model: "rock_largeB.glb", pos: [45, 0, 40], section: "Pneumonia Detection" },
+    { model: "rock_largeC.glb", pos: [40, 0, 50], section: "Grocery Management" },
+    { model: "statue_obelisk.glb", pos: [50, 0, 35], section: "Restaurant Management" },
+    { model: "rock_largeD.glb", pos: [35, 0, 45], section: "Travel Genie" },
+    { model: "statue_column.glb", pos: [45, 0, 50], section: "Interest Calculator" }
+];
+
+projectRocks.forEach((rock, index) => {
+    loadModel(`/Models/${rock.model}`, rock.pos, [2.5, 2.5, 2.5], rock.section, "glow", true);
+    
+    // Add surrounding details
+    if (index % 2 === 0) {
+        loadModel("/Models/campfire_stones.glb", [
+            rock.pos[0] + 3,
+            0,
+            rock.pos[2] + 3
+        ], [1, 1, 1], null, "fire");
+    }
+});
+
+// � Enhanced Education Flowers with Magical Effects
+function addEnhancedFlower(position, label, color = 0xFF69B4) {
+    const stemGeometry = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 8);
+    const stemMaterial = new THREE.MeshStandardMaterial({ color: 0x00AA00 });
     const stem = new THREE.Mesh(stemGeometry, stemMaterial);
-    stem.position.set(position[0], 0.5, position[1]);
+    stem.position.set(position[0], 0.75, position[1]);
     stem.castShadow = true;
     stem.receiveShadow = true;
     scene.add(stem);
 
-    const petalGeometry = new THREE.SphereGeometry(0.2, 32, 32);
-    const petalMaterial = new THREE.MeshStandardMaterial({ color: 0xFF69B4 });
-    const petal = new THREE.Mesh(petalGeometry, petalMaterial);
-    petal.position.set(position[0], 1, position[1]);
-    petal.castShadow = true;
-    petal.receiveShadow = true;
-    scene.add(petal);
-
-    makeClickable(petal, label);
+    // Multi-layered petals
+    for (let i = 0; i < 3; i++) {
+        const petalGeometry = new THREE.SphereGeometry(0.3 - i * 0.05, 8, 6);
+        const petalMaterial = new THREE.MeshStandardMaterial({ 
+            color: color,
+            transparent: true,
+            opacity: 0.8 - i * 0.1
+        });
+        const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+        petal.position.set(position[0], 1.5 + i * 0.1, position[1]);
+        petal.scale.y = 0.3;
+        petal.castShadow = true;
+        petal.receiveShadow = true;
+        scene.add(petal);
+        
+        if (i === 0) makeClickable(petal, label);
+        animatedObjects.push({ object: petal, type: "flower", originalY: petal.position.y });
+    }
 }
 
-addFlower([40 + Math.random() * 20, 40 + Math.random() * 20], "Class X");
-addFlower([50 + Math.random() * 20, 50 + Math.random() * 20], "Class XII");
-addFlower([60 + Math.random() * 20, 60 + Math.random() * 20], "IIIT Bangalore");
+addEnhancedFlower([-45, 45], "Class X", 0xFF1493);
+addEnhancedFlower([-50, 55], "Class XII", 0xFF69B4);
+addEnhancedFlower([-55, 50], "IIIT Bangalore", 0x9370DB);
 
-// 🏆 Group of Statues (Certificates and Scores)
-loadModel("/Models/statue_obelisk.glb", [60 + Math.random() * 20, 0, 60 + Math.random() * 20], [1, 1, 1], "Data Science Certification");
-loadModel("/Models/statue_obelisk.glb", [70 + Math.random() * 20, 0, 70 + Math.random() * 20], [1, 1, 1], "Machine Learning Certification");
-loadModel("/Models/statue_obelisk.glb", [80 + Math.random() * 20, 0, 80 + Math.random() * 20], [1, 1, 1], "Python Basic Certification");
-loadModel("/Models/statue_obelisk.glb", [90 + Math.random() * 20, 0, 90 + Math.random() * 20], [1, 1, 1], "JEE Mains");
-loadModel("/Models/statue_obelisk.glb", [95 + Math.random() * 20, 0, 95 + Math.random() * 20], [1, 1, 1], "JEE Advanced");
-loadModel("/Models/statue_obelisk.glb", [100 + Math.random() * 20, 0, 100 + Math.random() * 20], [1, 1, 1], "NDA Qualified");
+// 🏆 Enhanced Certificate Monuments
+const certificateModels = [
+    { model: "statue_obelisk.glb", pos: [75, 0, -25], section: "Data Science Certification" },
+    { model: "statue_column.glb", pos: [85, 0, -30], section: "Machine Learning Certification" },
+    { model: "statue_columnDamaged.glb", pos: [80, 0, -35], section: "Python Basic Certification" },
+    { model: "statue_ring.glb", pos: [90, 0, -25], section: "JEE Mains" },
+    { model: "statue_head.glb", pos: [75, 0, -35], section: "JEE Advanced" },
+    { model: "statue_block.glb", pos: [85, 0, -40], section: "NDA Qualified" }
+];
 
-// 🛶 Canoe
-loadModel("/Models/canoe.glb", [-30 + Math.random() * 20, 0.1, -30 + Math.random() * 20], [2.5, 2.5, 2.5], null, "canoe");
+certificateModels.forEach((cert, index) => {
+    loadModel(`/Models/${cert.model}`, cert.pos, [1.5, 1.5, 1.5], cert.section, "monument", true);
+    
+    // Add torch-like lighting around certificates
+    const torchLight = new THREE.PointLight(0xffaa00, 1, 8);
+    torchLight.position.set(cert.pos[0] + 2, 3, cert.pos[2] + 2);
+    torchLight.castShadow = true;
+    scene.add(torchLight);
+});
 
-// 🔎 Raycasting for Click Detection
+// 🛶 Enhanced Canoe with Water Trail
+loadModel("/Models/canoe.glb", [-55, 0.1, -55], [2.5, 2.5, 2.5], null, "canoe");
+loadModel("/Models/canoe_paddle.glb", [-53, 0.5, -57], [1.5, 1.5, 1.5], null, "paddle");
+
+// 🌟 Mystical Elements
+// Floating crystals
+for (let i = 0; i < 12; i++) {
+    const crystalGeometry = new THREE.OctahedronGeometry(0.5);
+    const crystalMaterial = new THREE.MeshBasicMaterial({
+        color: new THREE.Color().setHSL(Math.random(), 0.8, 0.6),
+        transparent: true,
+        opacity: 0.7
+    });
+    const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+    crystal.position.set(
+        (Math.random() - 0.5) * 200,
+        5 + Math.random() * 10,
+        (Math.random() - 0.5) * 200
+    );
+    scene.add(crystal);
+    animatedObjects.push({ 
+        object: crystal, 
+        type: "crystal", 
+        originalY: crystal.position.y,
+        rotationSpeed: (Math.random() - 0.5) * 0.02
+    });
+}
+
+// 🔎 Enhanced Raycasting for Click Detection with Visual Feedback
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -306,7 +778,12 @@ function onMouseClick(event) {
     if (intersects.length > 0) {
         const clickedObject = intersects[0].object;
         if (clickedObject.userData.section) {
+            // Create click effect
+            createParticleExplosion(intersects[0].point, 0xffffff, 25);
             showPortfolioSection(clickedObject.userData.section);
+            
+            // Add click sound effect (placeholder for future audio implementation)
+            console.log("Click sound effect triggered");
         }
     }
 }
@@ -371,6 +848,11 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Update bloom pass
+    bloomPass.setSize(window.innerWidth, window.innerHeight);
+    
     // Ensure controls visibility updates on resize
     if (gameStarted) {
         document.getElementById("controls").style.display = window.innerWidth < 768 ? "flex" : "none";
@@ -378,17 +860,36 @@ function onWindowResize() {
 }
 window.addEventListener("resize", onWindowResize);
 
-// 🎬 Animation Loop
+// 📊 HUD and UI Management
+function updateHUD() {
+    if (gameStarted) {
+        document.getElementById('fps').textContent = Math.round(1 / 0.016);
+        document.getElementById('objects').textContent = scene.children.length;
+        document.getElementById('position').textContent = 
+            `${Math.round(player.position.x)}, ${Math.round(player.position.y)}, ${Math.round(player.position.z)}`;
+    }
+}
+
+// Update HUD every second
+setInterval(updateHUD, 1000);
+
+// 🎬 Enhanced Animation Loop with Day/Night Cycle and Advanced Effects
 let time = 0;
+let dayNightCycle = 0;
+
 function animate() {
+    time += 0.016; // Assuming 60fps
+    dayNightCycle += params.dayNightSpeed;
+    
     if (!gameStarted) {
-        renderer.render(scene, camera); // Render static scene before game starts
+        composer.render(); // Use composer for post-processing
         requestAnimationFrame(animate);
         return;
     }
 
     requestAnimationFrame(animate);
 
+    // Player Movement
     let moveX = 0, moveZ = 0;
     if (movement.forward) moveZ -= speed;
     if (movement.backward) moveZ += speed;
@@ -399,6 +900,7 @@ function animate() {
     playerDirection.applyEuler(player.rotation);
     player.position.add(playerDirection);
 
+    // Gravity and Jumping
     velocityY += gravity;
     player.position.y += velocityY;
 
@@ -408,18 +910,122 @@ function animate() {
         velocityY = 0;
     }
 
-    // Animate Objects
-    animatedObjects.forEach((obj) => {
-        if (obj.type === "canoe") {
-            obj.object.position.y = Math.sin(Date.now() * 0.002) * 0.1 + 0.1;
+    // Day/Night Cycle
+    const dayIntensity = (Math.sin(dayNightCycle) + 1) / 2;
+    const nightIntensity = 1 - dayIntensity;
+    
+    sunLight.intensity = dayIntensity * 1.5;
+    moonLight.intensity = nightIntensity * 0.8;
+    ambientLight.intensity = 0.2 + dayIntensity * 0.3;
+    
+    // Update sun position
+    const sunAngle = dayNightCycle;
+    sun.position.x = Math.cos(sunAngle) * 20;
+    sun.position.y = Math.sin(sunAngle) * 15 + 5;
+    sun.position.z = 5;
+    sunLight.position.copy(sun.position);
+    sunGlow.position.copy(sun.position);
+    
+    // Update sun glow shader
+    sunGlowMaterial.uniforms.time.value = time;
+    
+    // Update water shader
+    waterMaterial.uniforms.time.value = time;
+    
+    // Update portal shader
+    if (portalMaterial) {
+        portalMaterial.uniforms.time.value = time;
+    }
+
+    // Update particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        if (!particles[i].update()) {
+            particles.splice(i, 1);
+        }
+    }
+
+    // Animate mystical lights
+    mysticalLights.forEach((light, index) => {
+        light.intensity = 0.3 + Math.sin(time * 2 + index) * 0.2;
+        light.position.y = 2 + Math.sin(time + index) * 2;
+    });
+
+    // Enhanced Object Animations
+    animatedObjects.forEach((obj, index) => {
+        switch (obj.type) {
+            case "canoe":
+                obj.object.position.y = Math.sin(time * 2) * 0.15 + 0.1;
+                obj.object.rotation.z = Math.sin(time * 1.5) * 0.05;
+                break;
+                
+            case "paddle":
+                obj.object.rotation.y += 0.01;
+                break;
+                
+            case "float":
+                obj.object.position.y = obj.originalY + Math.sin(time + index) * 0.5;
+                if (obj.partner) {
+                    obj.partner.position.y = obj.object.position.y + 1.1;
+                }
+                break;
+                
+            case "glow":
+                obj.object.position.y = obj.originalY + Math.sin(time * 2 + index) * 0.3;
+                break;
+                
+            case "fire":
+                obj.object.position.y = Math.sin(time * 4 + index) * 0.1;
+                obj.object.rotation.y += 0.02;
+                break;
+                
+            case "flower":
+                obj.object.position.y = obj.originalY + Math.sin(time * 1.5 + index * 0.5) * 0.1;
+                obj.object.rotation.y += 0.005;
+                break;
+                
+            case "monument":
+                obj.object.rotation.y += 0.003;
+                break;
+                
+            case "crystal":
+                obj.object.position.y = obj.originalY + Math.sin(time + index * 0.8) * 1.5;
+                obj.object.rotation.x += obj.rotationSpeed;
+                obj.object.rotation.y += obj.rotationSpeed * 1.5;
+                obj.object.rotation.z += obj.rotationSpeed * 0.7;
+                break;
+                
+            case "portal":
+                obj.object.rotation.z += 0.01;
+                break;
         }
     });
 
-    // Animate Arrows
-    arrows.forEach((arrow) => {
-        arrow.position.y = 3 + Math.sin(Date.now() * 0.002) * 0.3;
+    // Enhanced Arrow Animations
+    arrows.forEach((arrowData, index) => {
+        const { arrow, glow, baseY } = arrowData;
+        const newY = baseY + Math.sin(time * 2 + index * 0.5) * 0.5;
+        arrow.position.y = newY;
+        glow.position.y = newY;
+        
+        // Pulsing glow effect
+        glow.material.opacity = 0.2 + Math.sin(time * 3 + index) * 0.1;
+        arrow.rotation.y += 0.01;
+        glow.rotation.y += 0.01;
     });
 
-    renderer.render(scene, camera);
+    // Weather effects (if enabled)
+    if (params.weatherEnabled && Math.random() < 0.02) {
+        // Occasional magical sparkles
+        const sparklePos = new THREE.Vector3(
+            player.position.x + (Math.random() - 0.5) * 20,
+            player.position.y + Math.random() * 10,
+            player.position.z + (Math.random() - 0.5) * 20
+        );
+        const sparkleVel = new THREE.Vector3(0, 0.2, 0);
+        const sparkle = new Particle(sparklePos, sparkleVel, 0xffffaa, 1.5);
+        particles.push(sparkle);
+    }
+
+    composer.render();
 }
 animate(); // Start with static rendering until game begins
