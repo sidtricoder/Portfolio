@@ -316,7 +316,16 @@ document.addEventListener("keydown", (event) => {
         movement.jumping = true;
     }
     if (event.key === "g" || event.key === "G") {
-        gui.domElement.style.display = gui.domElement.style.display === 'none' ? 'block' : 'none';
+        const isVisible = gui.domElement.style.display !== 'none';
+        gui.domElement.style.display = isVisible ? 'none' : 'block';
+        
+        // Position the GUI panel to avoid overlap with teleport guide
+        if (!isVisible) {
+            gui.domElement.style.position = 'fixed';
+            gui.domElement.style.top = '20px';
+            gui.domElement.style.right = '250px'; // Offset from teleport guide
+            gui.domElement.style.zIndex = '1600';
+        }
     }
     if (event.key === "1") teleportToArea("projects");
     if (event.key === "2") teleportToArea("education");

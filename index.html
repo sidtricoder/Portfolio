@@ -323,7 +323,7 @@
             font-family: monospace;
             font-size: 12px;
             display: none;
-            z-index: 1400;
+            z-index: 1300;
             border: 1px solid rgba(30, 144, 255, 0.3);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         }
@@ -388,6 +388,40 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        /* dat.GUI Styling - Ensure it appears above other elements */
+        .dg.ac {
+            z-index: 1600 !important;
+            position: fixed !important;
+            top: 20px !important;
+            right: 20px !important;
+        }
+
+        .dg.main {
+            background: rgba(0, 0, 0, 0.9) !important;
+            border: 1px solid rgba(30, 144, 255, 0.3) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        .dg.main .close-button {
+            background: rgba(30, 144, 255, 0.8) !important;
+            border-radius: 4px !important;
+        }
+
+        .dg li:not(.folder) {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        .dg li.title {
+            background: rgba(30, 144, 255, 0.8) !important;
+            color: white !important;
+        }
+
+        .dg .property-name {
+            color: #1e90ff !important;
         }
     </style>
 </head>
