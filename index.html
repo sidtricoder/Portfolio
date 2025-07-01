@@ -162,6 +162,13 @@
             box-shadow: 0 25px 80px rgba(0, 0, 0, 0.7);
             position: relative;
             backdrop-filter: blur(20px);
+            /* Remove scrollbar */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* Internet Explorer 10+ */
+        }
+
+        .popup-content::-webkit-scrollbar {
+            display: none; /* WebKit */
         }
 
         .popup-content::before {
@@ -290,7 +297,7 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            z-index: 500;
+            z-index: 1500;
             color: white;
             font-family: monospace;
             display: none;
@@ -309,15 +316,16 @@
             position: fixed;
             top: 20px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             padding: 15px;
             border-radius: 10px;
             color: white;
             font-family: monospace;
             font-size: 12px;
             display: none;
-            z-index: 500;
+            z-index: 1400;
             border: 1px solid rgba(30, 144, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         }
 
         .teleport-guide h4 {

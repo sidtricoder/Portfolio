@@ -142,9 +142,9 @@ moonLight.position.set(-5, 8, -5);
 moonLight.visible = false;
 scene.add(moonLight);
 
-// Point lights for mystical atmosphere
+// Point lights for mystical atmosphere (reduced for performance)
 const mysticalLights = [];
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < 4; i++) {
     const light = new THREE.PointLight(0x66aaff, 0.5, 20);
     light.position.set(
         Math.random() * 200 - 100,
@@ -215,6 +215,166 @@ const water = new THREE.Mesh(waterGeometry, waterMaterial);
 water.rotation.x = -Math.PI / 2;
 water.position.set(-60, 0.1, -60);
 scene.add(water);
+
+// 🏔️ Mountain Range with Flowing River
+function createMountain(position, scale, height) {
+    const mountainGeometry = new THREE.ConeGeometry(scale, height, 8, 3);
+    const mountainMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8B7355,
+        roughness: 0.9
+    });
+    
+    // Deform the geometry for more natural look
+    const vertices = mountainGeometry.attributes.position.array;
+    for (let i = 0; i < vertices.length; i += 3) {
+        vertices[i] += (Math.random() - 0.5) * scale * 0.3;
+        vertices[i + 2] += (Math.random() - 0.5) * scale * 0.3;
+    }
+    mountainGeometry.attributes.position.needsUpdate = true;
+    mountainGeometry.computeVertexNormals();
+    
+    const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+    mountain.position.set(position.x, position.y, position.z);
+    mountain.castShadow = true;
+    mountain.receiveShadow = true;
+    scene.add(mountain);
+    
+    // Add snow cap
+    if (height > 15) {
+        const snowGeometry = new THREE.ConeGeometry(scale * 0.7, height * 0.3, 8);
+        const snowMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const snowCap = new THREE.Mesh(snowGeometry, snowMaterial);
+        snowCap.position.set(position.x, position.y + height * 0.6, position.z);
+        scene.add(snowCap);
+    }
+}
+
+// Create mountain range in the background
+const mountainPositions = [
+    { x: -150, y: 8, z: -100, scale: 25, height: 20 },
+    { x: -120, y: 10, z: -120, scale: 30, height: 25 },
+    { x: -180, y: 6, z: -80, scale: 20, height: 18 },
+    { x: 150, y: 12, z: -100, scale: 35, height: 30 },
+    { x: 120, y: 8, z: -120, scale: 28, height: 22 },
+    { x: 180, y: 10, z: -90, scale: 32, height: 26 }
+];
+
+mountainPositions.forEach(pos => {
+    createMountain(pos, pos.scale, pos.height);
+});
+
+// 🌊 Flowing River from Mountains
+function createRiver() {
+    const riverPath = [
+        { x: -150, z: -100 },
+        { x: -120, z: -80 },
+        { x: -90, z: -70 },
+        { x: -70, z: -65 },
+        { x: -60, z: -60 }
+    ];
+    
+    for (let i = 0; i < riverPath.length - 1; i++) {
+        const start = riverPath[i];
+        const end = riverPath[i + 1];
+        
+        const riverSegmentGeometry = new THREE.PlaneGeometry(
+            Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.z - start.z, 2)) || 20, 8, 10, 2
+        );
+        const riverSegmentMaterial = waterMaterial.clone();
+        const riverSegment = new THREE.Mesh(riverSegmentGeometry, riverSegmentMaterial);
+        
+        riverSegment.position.set(
+            (start.x + end.x) / 2,
+            0.05,
+            (start.z + end.z) / 2
+        );
+        riverSegment.rotation.x = -Math.PI / 2;
+        riverSegment.rotation.z = Math.atan2(end.z - start.z, end.x - start.x);
+        
+        scene.add(riverSegment);
+    }
+}
+createRiver();
+
+// 🌿 Jungle Elements
+function addJungleElements() {
+    // Dense vegetation areas
+    const jungleAreas = [
+        { center: { x: -80, z: 50 }, radius: 30 },
+        { center: { x: 60, z: -50 }, radius: 25 },
+        { center: { x: 100, z: 80 }, radius: 35 }
+    ];
+    
+    jungleAreas.forEach(area => {
+        // Add dense bushes
+        for (let i = 0; i < 15; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * area.radius;
+            const x = area.center.x + Math.cos(angle) * distance;
+            const z = area.center.z + Math.sin(angle) * distance;
+            
+            loadModel("/Models/plant_bushLarge.glb", [x, 0, z], [1 + Math.random(), 1 + Math.random(), 1 + Math.random()]);
+        }
+        
+        // Add hanging moss
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * area.radius * 0.8;
+            const x = area.center.x + Math.cos(angle) * distance;
+            const z = area.center.z + Math.sin(angle) * distance;
+            
+            loadModel("/Models/hanging_moss.glb", [x, 3 + Math.random() * 2, z], [1, 1, 1]);
+        }
+        
+        // Add mushroom groups
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * area.radius;
+            const x = area.center.x + Math.cos(angle) * distance;
+            const z = area.center.z + Math.sin(angle) * distance;
+            
+            const mushroomType = Math.random() > 0.5 ? "mushroom_redGroup.glb" : "mushroom_tanGroup.glb";
+            loadModel(`/Models/${mushroomType}`, [x, 0, z], [1.2, 1.2, 1.2]);
+        }
+    });
+    
+    // Add lily pads near water
+    for (let i = 0; i < 10; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 15 + Math.random() * 20;
+        const x = -60 + Math.cos(angle) * distance;
+        const z = -60 + Math.sin(angle) * distance;
+        
+        const lilyType = Math.random() > 0.5 ? "lily_large.glb" : "lily_small.glb";
+        loadModel(`/Models/${lilyType}`, [x, 0.02, z], [1, 1, 1]);
+    }
+    
+    // Scattered logs and rocks
+    for (let i = 0; i < 20; i++) {
+        const x = (Math.random() - 0.5) * 300;
+        const z = (Math.random() - 0.5) * 300;
+        
+        if (Math.random() > 0.5) {
+            const logType = ["log.glb", "log_large.glb", "log_stack.glb"][Math.floor(Math.random() * 3)];
+            loadModel(`/Models/${logType}`, [x, 0, z], [1, 1, 1]);
+        } else {
+            const rockType = ["rock_smallA.glb", "rock_smallB.glb", "rock_smallC.glb"][Math.floor(Math.random() * 3)];
+            loadModel(`/Models/${rockType}`, [x, 0, z], [1, 1, 1]);
+        }
+    }
+    
+    // Add various grass types
+    for (let i = 0; i < 50; i++) {
+        const x = (Math.random() - 0.5) * 400;
+        const z = (Math.random() - 0.5) * 400;
+        
+        const grassType = ["grass.glb", "grass_large.glb", "grass_leafs.glb"][Math.floor(Math.random() * 3)];
+        loadModel(`/Models/${grassType}`, [x, 0, z], [0.8 + Math.random() * 0.4, 0.8 + Math.random() * 0.4, 0.8 + Math.random() * 0.4]);
+    }
+}
+
+// Initialize jungle elements
+addJungleElements();
 
 // 🎮 Player
 const player = new THREE.Object3D();
@@ -739,9 +899,9 @@ certificateModels.forEach((cert, index) => {
 loadModel("/Models/canoe.glb", [-55, 0.1, -55], [2.5, 2.5, 2.5], null, "canoe");
 loadModel("/Models/canoe_paddle.glb", [-53, 0.5, -57], [1.5, 1.5, 1.5], null, "paddle");
 
-// 🌟 Mystical Elements
-// Floating crystals
-for (let i = 0; i < 12; i++) {
+// 🌟 Mystical Elements (Optimized)
+// Floating crystals (reduced for performance)
+for (let i = 0; i < 6; i++) {
     const crystalGeometry = new THREE.OctahedronGeometry(0.5);
     const crystalMaterial = new THREE.MeshBasicMaterial({
         color: new THREE.Color().setHSL(Math.random(), 0.8, 0.6),
@@ -950,16 +1110,12 @@ function animate() {
         light.position.y = 2 + Math.sin(time + index) * 2;
     });
 
-    // Enhanced Object Animations
+    // Enhanced Object Animations (Optimized)
     animatedObjects.forEach((obj, index) => {
         switch (obj.type) {
             case "canoe":
                 obj.object.position.y = Math.sin(time * 2) * 0.15 + 0.1;
                 obj.object.rotation.z = Math.sin(time * 1.5) * 0.05;
-                break;
-                
-            case "paddle":
-                obj.object.rotation.y += 0.01;
                 break;
                 
             case "float":
@@ -969,29 +1125,13 @@ function animate() {
                 }
                 break;
                 
-            case "glow":
-                obj.object.position.y = obj.originalY + Math.sin(time * 2 + index) * 0.3;
-                break;
-                
             case "fire":
                 obj.object.position.y = Math.sin(time * 4 + index) * 0.1;
-                obj.object.rotation.y += 0.02;
-                break;
-                
-            case "flower":
-                obj.object.position.y = obj.originalY + Math.sin(time * 1.5 + index * 0.5) * 0.1;
-                obj.object.rotation.y += 0.005;
-                break;
-                
-            case "monument":
-                obj.object.rotation.y += 0.003;
                 break;
                 
             case "crystal":
                 obj.object.position.y = obj.originalY + Math.sin(time + index * 0.8) * 1.5;
-                obj.object.rotation.x += obj.rotationSpeed;
-                obj.object.rotation.y += obj.rotationSpeed * 1.5;
-                obj.object.rotation.z += obj.rotationSpeed * 0.7;
+                obj.object.rotation.y += obj.rotationSpeed;
                 break;
                 
             case "portal":
@@ -1000,21 +1140,21 @@ function animate() {
         }
     });
 
-    // Enhanced Arrow Animations
-    arrows.forEach((arrowData, index) => {
-        const { arrow, glow, baseY } = arrowData;
-        const newY = baseY + Math.sin(time * 2 + index * 0.5) * 0.5;
-        arrow.position.y = newY;
-        glow.position.y = newY;
-        
-        // Pulsing glow effect
-        glow.material.opacity = 0.2 + Math.sin(time * 3 + index) * 0.1;
-        arrow.rotation.y += 0.01;
-        glow.rotation.y += 0.01;
-    });
+    // Enhanced Arrow Animations (Optimized)
+    if (time % 0.1 < 0.016) { // Update arrows less frequently
+        arrows.forEach((arrowData, index) => {
+            const { arrow, glow, baseY } = arrowData;
+            const newY = baseY + Math.sin(time * 2 + index * 0.5) * 0.5;
+            arrow.position.y = newY;
+            glow.position.y = newY;
+            
+            // Pulsing glow effect
+            glow.material.opacity = 0.2 + Math.sin(time * 3 + index) * 0.1;
+        });
+    }
 
-    // Weather effects (if enabled)
-    if (params.weatherEnabled && Math.random() < 0.02) {
+    // Weather effects (if enabled and reduced frequency)
+    if (params.weatherEnabled && Math.random() < 0.005) {
         // Occasional magical sparkles
         const sparklePos = new THREE.Vector3(
             player.position.x + (Math.random() - 0.5) * 20,
