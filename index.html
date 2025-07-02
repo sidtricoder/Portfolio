@@ -28,14 +28,14 @@
             align-items: center;
             text-align: center;
             z-index: 2000;
-            padding: 20px;
+            padding: 15px;
             box-sizing: border-box;
             backdrop-filter: blur(20px);
         }
 
         .welcome-screen h1 {
-            font-size: clamp(28px, 6vw, 48px);
-            margin-bottom: 20px;
+            font-size: clamp(20px, 4vw, 32px);
+            margin-bottom: 15px;
             background: linear-gradient(45deg, #1e90ff, #ff6b6b, #4ecdc4);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -49,40 +49,42 @@
         }
 
         .welcome-screen p {
-            font-size: clamp(14px, 3vw, 18px);
-            margin: 10px 0;
-            max-width: 700px;
-            line-height: 1.8;
+            font-size: clamp(12px, 2.5vw, 14px);
+            margin: 8px 0;
+            max-width: 600px;
+            line-height: 1.5;
             opacity: 0.9;
         }
 
         .controls-hint {
             background: rgba(0, 0, 0, 0.7);
-            padding: 20px;
-            border-radius: 15px;
-            margin: 25px 0;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
             border: 1px solid rgba(30, 144, 255, 0.3);
             backdrop-filter: blur(10px);
         }
 
         .controls-hint h3 {
             color: #1e90ff;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             text-shadow: 0 0 10px rgba(30, 144, 255, 0.5);
+            font-size: clamp(14px, 3vw, 18px);
         }
 
         .controls-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
         }
 
         .control-item {
             background: rgba(255, 255, 255, 0.1);
-            padding: 12px;
-            border-radius: 8px;
+            padding: 8px;
+            border-radius: 6px;
             border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: clamp(10px, 2vw, 12px);
         }
 
         .key {
@@ -97,8 +99,8 @@
         }
 
         .welcome-screen button {
-            padding: 18px 40px;
-            font-size: clamp(16px, 4vw, 22px);
+            padding: 12px 30px;
+            font-size: clamp(14px, 3vw, 18px);
             background: linear-gradient(45deg, #1e90ff, #8a2be2);
             color: white;
             border: none;
@@ -109,7 +111,7 @@
             text-transform: uppercase;
             font-weight: bold;
             letter-spacing: 2px;
-            margin-top: 30px;
+            margin-top: 20px;
             position: relative;
             overflow: hidden;
         }
